@@ -618,7 +618,7 @@ static NvBool GetFixedModeTimings(
     if (pDpyEvo->pConnectorEvo->signalFormat == NVKMS_CONNECTOR_SIGNAL_FORMAT_DSI) {
         ret = ReadDSITimingsFromResman(pDpyEvo, &timings, &bpc);
     } else {
-        ret = ParseDfpFixedTimings(pDpyEvo, &timings, &bpc, &pSuperframeInfo);
+        ret = ParseDfpFixedTimings(pDpyEvo, &timings, &bpc, pSuperframeInfo);
     }
 
     if (!ret) {
