@@ -119,15 +119,22 @@ static NvBool DpyConnectEvo(
         }
     } else {
         ReadAndApplyEdidEvo(pDpyEvo, pParams);
+        if ((pDpyEvo->pConnectorEvo->signalFormat == NVKMS_CONNECTOR_SIGNAL_FORMAT_TMDS) &&
+            GetFixedModeTimings(pDpyEvo, &pParams->reply.superframeInfo)) {
+            goto done;
+        } else {
+            ReadAndApplyEdidEvo(pDpyEvo, pParams);
+        }
     }
 
+done:
     nvUpdateInfoFrames(pDpyEvo);
 
     return TRUE;
 }
 
 /*
- * DpyAssignColorSpaceCaps() - parse both the CEA-861 extension block and 
+ * DpyAssignColorSpaceCaps() - parse both the CEA-861 extension block and
  * the EDID 1.4 block to determine YCbCr422/444 capability.
  */
 static void DpyAssignColorSpaceCaps(NVDpyEvoPtr pDpyEvo,
@@ -535,7 +542,7 @@ fail:
     return FALSE;
 }
 
-static NvBool ReadDPSerializerTimings(
+static NvBool ParseDfpFixedTimings(
     NVDpyEvoRec *pDpyEvo,
     NVT_TIMING *pTimings,
     NvU8 *pBpc,
@@ -548,7 +555,13 @@ static NvBool ReadDPSerializerTimings(
 
     timingParams.subDeviceInstance = pDispEvo->displayOwner;
     timingParams.displayId = nvDpyIdToNvU32(pDpyEvo->pConnectorEvo->displayId);
-    timingParams.stream = pDpyEvo->dp.serializerStreamIndex;
+
+    if (nvConnectorIsDPSerializer(pDpyEvo->pConnectorEvo)) {
+        timingParams.stream = pDpyEvo->dp.serializerStreamIndex;
+    } else {
+        // For HDMI, multiple streams are not supported and supports single stream
+        timingParams.stream = 0;
+    }
 
     ret = nvRmApiControl(nvEvoGlobal.clientHandle,
                          pDevEvo->displayCommonHandle,
@@ -604,9 +617,8 @@ static NvBool GetFixedModeTimings(
 
     if (pDpyEvo->pConnectorEvo->signalFormat == NVKMS_CONNECTOR_SIGNAL_FORMAT_DSI) {
         ret = ReadDSITimingsFromResman(pDpyEvo, &timings, &bpc);
-    } else if (nvConnectorIsDPSerializer(pDpyEvo->pConnectorEvo)) {
-        ret = ReadDPSerializerTimings(pDpyEvo, &timings, &bpc,
-                                      pSuperframeInfo);
+    } else {
+        ret = ParseDfpFixedTimings(pDpyEvo, &timings, &bpc, &pSuperframeInfo);
     }
 
     if (!ret) {
